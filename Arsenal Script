@@ -1,0 +1,265 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "Arsenal Script✔🤑",
+   Icon = 0,
+   LoadingTitle = "Tv0 hub",
+   LoadingSubtitle = "by Tv0",
+   ShowText = "Rayfield",
+   Theme = "Default",
+   ToggleUIKeybind = "K",
+   DisableRayfieldPrompts = false,
+   DisableBuildWarnings = false,
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = nil,
+      FileName = "Tv0 Hub"
+   },
+   Discord = {
+      Enabled = true,
+      Invite = "X7PcFpmf",
+      RememberJoins = true
+   },
+   KeySystem = false,
+   KeySettings = {
+      Title = "Untitled",
+      Subtitle = "Key System",
+      Note = "No method of obtaining the key is provided",
+      FileName = "Key",
+      SaveKey = true,
+      GrabKeyFromSite = false,
+      Key = {"Hello"}
+   }
+})
+
+-- Create tabs
+local MainTab = Window:CreateTab("🏡 Home", 4483362458)
+local AimbotTab = Window:CreateTab("Aimbot", 4483362458)
+local ESPTab = Window:CreateTab("ESP", 4483362458)
+
+-- Home section
+local MainSection = MainTab:CreateSection("Farming")
+
+Rayfield:Notify({
+   Title = "Script Activated",
+   Content = "Tv0 Hub loaded successfully.",
+   Duration = 6.5,
+   Image = 4483362458,
+})
+
+MainTab:CreateButton({
+    Name = "Teleport to Guapo",
+    Callback = function()
+        local player = game.Players.LocalPlayer
+        local character = player.Character or player.CharacterAdded:Wait()
+        local hrp = character:WaitForChild("HumanoidRootPart")
+
+        local guapo = workspace:FindFirstChild("Guapo")
+        if guapo and guapo:FindFirstChild("HumanoidRootPart") then
+            hrp.CFrame = guapo.HumanoidRootPart.CFrame + Vector3.new(0, 5, 0)
+        else
+            warn("Guapo not found in workspace.")
+        end
+    end
+})
+
+MainTab:CreateSlider({
+   Name = "Walkspeed",
+   Range = {0, 300},
+   Increment = 1,
+   Suffix = "Speed",
+   CurrentValue = 16,
+   Flag = "Slider1",
+   Callback = function(Value)
+       local humanoid = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+       if humanoid then
+           humanoid.WalkSpeed = Value
+       end
+   end,
+})
+
+-- Anti-Ban Config
+local AntiBan = {
+    Enabled = true,
+    MaxActiveTime = 60, -- seconds before auto-disable
+    LastToggleTime = 0,
+    ToggleCooldown = 3, -- seconds between toggles
+    MinSensitivity = 0.12,
+    MaxSensitivity = 0.18,
+    RandomDelayMin = 0.01,
+    RandomDelayMax = 0.03,
+}
+
+local function RandomSensitivity()
+    return math.random() * (AntiBan.MaxSensitivity - AntiBan.MinSensitivity) + AntiBan.MinSensitivity
+end
+
+-- Variables needed globally for aimbot
+local Camera = workspace.CurrentCamera
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local LocalPlayer = Players.LocalPlayer
+
+local HoldingRightClick = false
+local FOVCircle = nil
+
+-- Aimbot toggle
+AimbotTab:CreateToggle({
+   Name = "Aimbot",
+   CurrentValue = false,
+   Flag = "Toggle1",
+   Callback = function(Value)
+       local currentTime = tick()
+
+       -- Toggle cooldown to reduce spam & detection
+       if (currentTime - AntiBan.LastToggleTime) < AntiBan.ToggleCooldown then
+           Rayfield:Notify({
+               Title = "Anti-Ban",
+               Content = "Please wait before toggling again!",
+               Duration = 3,
+               Image = 4483362458,
+           })
+           -- Revert toggle UI to previous state
+           AimbotTab:UpdateToggle("Toggle1", not Value)
+           return
+       end
+       AntiBan.LastToggleTime = currentTime
+
+       _G.AimbotEnabled = Value
+       _G.TeamCheck = false
+       _G.AimPart = "Head"
+       _G.Sensitivity = 0
+
+       -- Initialize or clean FOVCircle
+       if FOVCircle then
+           FOVCircle:Remove()
+           FOVCircle = nil
+       end
+
+       if Value then
+           FOVCircle = Drawing.new("Circle")
+           FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+           FOVCircle.Radius = 80
+           FOVCircle.Filled = false
+           FOVCircle.Color = Color3.fromRGB(255, 255, 255)
+           FOVCircle.Visible = true
+           FOVCircle.Transparency = 0.7
+           FOVCircle.NumSides = 64
+           FOVCircle.Thickness = 0
+
+           -- Auto-disable after MaxActiveTime seconds for anti-ban
+           spawn(function()
+               local startTime = tick()
+               while _G.AimbotEnabled and (tick() - startTime) < AntiBan.MaxActiveTime do
+                   wait(1)
+               end
+               if _G.AimbotEnabled and (tick() - startTime) >= AntiBan.MaxActiveTime then
+                   _G.AimbotEnabled = false
+                   Rayfield:Notify({
+                       Title = "Anti-Ban",
+                       Content = "Aimbot auto-disabled after max active time.",
+                       Duration = 4,
+                       Image = 4483362458,
+                   })
+                   AimbotTab:UpdateToggle("Toggle1", false)
+                   if FOVCircle then
+                       FOVCircle:Remove()
+                       FOVCircle = nil
+                   end
+               end
+           end)
+       else
+           if FOVCircle then
+               FOVCircle:Remove()
+               FOVCircle = nil
+           end
+       end
+   end,
+})
+
+-- Function to get closest player to mouse within FOV circle radius
+local function GetClosestPlayer()
+    local MaximumDistance = 80
+    local Target = nil
+
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer then
+            if _G.TeamCheck then
+                if v.Team == LocalPlayer.Team then continue end
+            end
+            local character = v.Character
+            if character and character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
+                local ScreenPoint = Camera:WorldToScreenPoint(character.HumanoidRootPart.Position)
+                local mousePos = UserInputService:GetMouseLocation()
+                local dist = (Vector2.new(mousePos.X, mousePos.Y) - Vector2.new(ScreenPoint.X, ScreenPoint.Y)).Magnitude
+                if dist < MaximumDistance then
+                    MaximumDistance = dist
+                    Target = v
+                end
+            end
+        end
+    end
+
+    return Target
+end
+
+-- Mouse right-click hold detection
+UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        HoldingRightClick = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        HoldingRightClick = false
+    end
+end)
+
+-- Aimbot aiming loop with anti-ban random delays & sensitivity
+RunService.RenderStepped:Connect(function()
+    if FOVCircle then
+        local mousePos = UserInputService:GetMouseLocation()
+        FOVCircle.Position = Vector2.new(mousePos.X, mousePos.Y)
+        FOVCircle.Radius = 80
+        FOVCircle.Filled = false
+        FOVCircle.Color = Color3.fromRGB(255, 255, 255)
+        FOVCircle.Visible = true
+        FOVCircle.Transparency = 0.7
+        FOVCircle.NumSides = 64
+        FOVCircle.Thickness = 0
+    end
+
+    if HoldingRightClick and _G.AimbotEnabled then
+        if AntiBan.Enabled then
+            wait(math.random(AntiBan.RandomDelayMin * 1000, AntiBan.RandomDelayMax * 1000) / 1000)
+            _G.Sensitivity = RandomSensitivity()
+        else
+            _G.Sensitivity = 0
+        end
+
+        local target = GetClosestPlayer()
+        if target and target.Character and target.Character:FindFirstChild(_G.AimPart) then
+            TweenService:Create(Camera, TweenInfo.new(_G.Sensitivity, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
+                CFrame = CFrame.new(Camera.CFrame.Position, target.Character[_G.AimPart].Position)
+            }):Play()
+        end
+    end
+end)
+
+
+-- ESP toggle
+ESPTab:CreateToggle({
+   Name = "Aimbot and ESP",
+   CurrentValue = false,
+   Flag = "Toggle2",
+   Callback = function(Value)
+       local MaxDistance = 400.5
+       local Players = game:GetService("Players")
+       local RunService = game:GetService("RunService")
+       local LocalPlayer = Players.LocalPlayer
+       local NametagsEnabled = Value
+
+       local function
